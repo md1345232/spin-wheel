@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spin Wheel — Demo</title>
+  <style>
+    :root{--size:360px}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e6edf3}
+    .wrap{display:grid;grid-template-columns:1fr;gap:20px;align-items:center;justify-items:center}
+    .wheel-container{width:var(--size);height:var(--size);position:relative}
+    .wheel{
+      width:100%;height:100%;border-radius:50%;background:conic-gradient(
+        #ff7b7b 0deg 45deg,
+        #ffd97b 45deg 90deg,
+        #8bd87b 90deg 135deg,
+        #7bd8ff 135deg 180deg,
+        #c07bff 180deg 225deg,
+        #ff7bde 225deg 270deg,
+        #7bfff0 270deg 315deg,
+        #ffd98f 315deg 360deg
+      );
+      display:block;transition:transform 4s cubic-bezier(.17,.89,.32,1.28);box-shadow:0 8px 30px rgba(2,6,23,0.6);position:relative;overflow:visible}
+    /* Labels arranged around the wheel */
+    .labels{position:absolute;inset:0;pointer-events:none;border-radius:50%}
+    .label{position:absolute;left:50%;top:50%;transform-origin:0 0;display:block;width:50%;text-align:left;padding-left:8px;font-weight:700}
+
+    .pointer{position:absolute;left:50%;top:-12px;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:20px solid #e11d48;z-index:3}
+    .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;background:#08122a;display:grid;place-items:center;z-index:2;border:6px solid rgba(255,255,255,0.06)}
+    button{background:#0ea5a4;border:0;color:#042b2b;padding:12px 20px;border-radius:10px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(2,6,23,0.4)}
+    button:active{transform:translateY(1px)}
+    .result{min-height:28px;margin-top:6px;font-weight:700}
+    .credits{opacity:0.6;font-size:12px;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="wheel-container">
+      <div class="pointer" aria-hidden="true"></div>
+      <div id="wheel" class="wheel" role="img" aria-label="Prize wheel"></div>
+      <div class="labels" id="labels"></div>
+      <div class="center">SPIN</div>
+    </div>
+    <div style="text-align:center;">
+      <button id="spinBtn">Spin</button>
+      <div class="result" id="result">Click spin to play</div>
+      <div class="credits">Simple single-file spin wheel. Copy to a .html file and open in your browser.</div>
+    </div>
+  </div>
+
+  <script>
+    // Customize the slice labels here
+    const labels = [
+      '10 Coins',
+      'Try Again',
+      '50 Coins',
+      'Small Prize',
+      '100 Coins',
+      'Jackpot!',
+      '20 Coins',
+      'Free Spin'
+    ];
+
+    const wheel = document.getElementById('wheel');
+    const labelsLayer = document.getElementById('labels');
+    const spinBtn = document.getElementById('spinBtn');
+    const resultEl = document.getElementById('result');
+    const slices = labels.length;
+    const sliceDeg = 360 / slices;
+
+    // Create text labels around the wheel
+    labelsLayer.innerHTML = '';
+    labels.forEach((text, i) => {
+      const angle = i * sliceDeg + sliceDeg / 2; // center angle of slice
+      const el = document.createElement('div');
+      el.className = 'label';
+      el.style.transform = `rotate(${angle}deg) translate(-50%, -50%)`;
+      el.style.width = '50%';
+      el.innerHTML = `<span style="display:inline-block;transform:rotate(${90 - angle}deg);">${text}</span>`;
+      labelsLayer.appendChild(el);
+    });
+
+    // Keep track of rotation state
+    let deg = 0;
+    let spinning = false;
+
+    function randomInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min }
+
+    spinBtn.addEventListener('click', () => {
+      if (spinning) return;
+      spinning = true;
+      resultEl.textContent = 'Spinning...';
+
+      // Choose a random slice index
+      const chosen = randomInt(0, slices - 1);
+
+      // Choose number of full spins for show
+      const fullSpins = randomInt(4, 7);
+
+      // The center angle of chosen slice (0 at top). We want that center to land at 0deg (pointer).
+      const sliceCenter = chosen * sliceDeg + sliceDeg / 2;
+
+      // Compute target rotation so that sliceCenter ends at 0deg.
+      // Since CSS rotation rotates clockwise positive, we rotate by (360 - sliceCenter)
+      const target = fullSpins * 360 + (360 - sliceCenter);
+
+      // Add a small offset to make it more natural (optional)
+      const offset = (Math.random() - 0.5) * (sliceDeg * 0.6); // +/- small amount
+
+      deg = deg + target + offset;
+      wheel.style.transition = 'transform 4s cubic-bezier(.17,.89,.32,1.28)';
+      wheel.style.transform = `rotate(${deg}deg)`;
+
+      // Wait for animation to finish
+      wheel.addEventListener('transitionend', function handler(){
+        wheel.style.transition = 'none'; // allow instant jumps next time
+        // Normalize deg to 0..360 to avoid growing numbers
+        deg = deg % 360;
+        wheel.style.transform = `rotate(${deg}deg)`;
+
+        // Determine final slice index from deg
+        const landedAngle = (360 - (deg % 360)) % 360; // angle at pointer
+        const landedIndex = Math.floor(landedAngle / sliceDeg);
+
+        resultEl.textContent = `Result: ${labels[landedIndex]}`;
+        spinning = false;
+        wheel.removeEventListener('transitionend', handler);
+      });
+    });
+
+    // Optional: keyboard control
+    document.addEventListener('keydown', (e)=>{ if(e.key===' '){ e.preventDefault(); spinBtn.click() } })
+  </script>
+</body>
+</html>
